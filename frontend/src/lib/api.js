@@ -100,8 +100,9 @@ export async function getDocumentPdf(fileId) {
 }
 
 export async function triggerSync() {
-  const response = await fetchWithAuth('/api/documents/sync', {
+  const response = await fetchWithAuth('/api/sync', {
     method: 'POST',
+    body: '{}',
   });
   return response.json();
 }
