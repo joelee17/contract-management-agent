@@ -8,6 +8,7 @@ import queryRoutes from './routes/query.js';
 import documentsRoutes from './routes/documents.js';
 import syncRoutes from './routes/sync.js';
 import webhooksRoutes from './routes/webhooks.js';
+import tagsRoutes from './routes/tags.js';
 import { startWatchChannel } from './services/driveService.js';
 
 const fastify = Fastify({ logger: true });
@@ -39,6 +40,7 @@ await fastify.register(authRoutes, { prefix: '/api/auth' });
 await fastify.register(queryRoutes, { prefix: '/api' });
 await fastify.register(documentsRoutes, { prefix: '/api' });
 await fastify.register(syncRoutes, { prefix: '/api' });
+await fastify.register(tagsRoutes, { prefix: '/api' });
 await fastify.register(webhooksRoutes, { prefix: '/api/webhooks' });
 
 // Start

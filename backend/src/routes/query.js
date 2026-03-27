@@ -9,7 +9,7 @@ const anthropic = new Anthropic({ apiKey: config.anthropicApiKey });
 
 export default async function queryRoutes(fastify) {
   fastify.post('/query', { preHandler: [authenticate] }, async (request, reply) => {
-    const { question, conversationId } = request.body || {};
+    const { question, conversationId, tagIds } = request.body || {};
     const userId = request.user.id;
 
     if (!question) {
@@ -32,8 +32,9 @@ export default async function queryRoutes(fastify) {
       [convId, 'user', question]
     );
 
-    // Retrieve relevant context and build prompt with sources
-    const { systemPrompt, userMessage, sources } = await retrieveAndBuildPrompt(question);
+    // Retrieve relevant context and build prompt with sources (optionally scoped by tags)
+    const activeTagIds = Array.isArray(tagIds) && tagIds.length > 0 ? tagIds.map(Number) : null;
+    const { systemPrompt, userMessage, sources } = await retrieveAndBuildPrompt(question, 8, activeTagIds);
 
     // Set SSE headers (must include CORS manually since we bypass Fastify's response pipeline)
     const origin = request.headers.origin;

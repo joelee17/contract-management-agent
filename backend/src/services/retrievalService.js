@@ -8,14 +8,33 @@ import { embedQuery } from './embeddingService.js';
  *
  * Returns { systemPrompt, userMessage, sources }.
  */
-export async function retrieveAndBuildPrompt(query, topK = 8) {
+export async function retrieveAndBuildPrompt(query, topK = 8, tagIds = null) {
   // 1. Embed the query
   const queryVector = await embedQuery(query);
   const embedding = pgvector.toSql(queryVector);
 
-  // 2. Cosine similarity search using pgvector
-  const result = await dbQuery(
-    `SELECT
+  // 2. Cosine similarity search using pgvector, optionally scoped to tagged documents
+  let sql, params;
+  if (tagIds && tagIds.length > 0) {
+    sql = `SELECT
+       id,
+       file_id,
+       file_name,
+       page_number,
+       section_heading,
+       chunk_text,
+       char_offset_start,
+       char_offset_end,
+       1 - (embedding <=> $1) AS similarity
+     FROM document_chunks
+     WHERE file_id IN (
+       SELECT file_id FROM document_tags WHERE tag_id = ANY($3::int[])
+     )
+     ORDER BY embedding <=> $1
+     LIMIT $2`;
+    params = [embedding, topK, tagIds];
+  } else {
+    sql = `SELECT
        id,
        file_id,
        file_name,
@@ -27,9 +46,10 @@ export async function retrieveAndBuildPrompt(query, topK = 8) {
        1 - (embedding <=> $1) AS similarity
      FROM document_chunks
      ORDER BY embedding <=> $1
-     LIMIT $2`,
-    [embedding, topK],
-  );
+     LIMIT $2`;
+    params = [embedding, topK];
+  }
+  const result = await dbQuery(sql, params);
 
   const sources = result.rows.map((row, idx) => ({
     sourceIndex: idx + 1,

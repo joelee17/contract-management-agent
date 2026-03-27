@@ -89,6 +89,23 @@ export async function initDb() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tags (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT UNIQUE NOT NULL,
+      color      TEXT NOT NULL DEFAULT '#6366f1',
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS document_tags (
+      file_id  TEXT NOT NULL REFERENCES indexed_files(file_id) ON DELETE CASCADE,
+      tag_id   INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (file_id, tag_id)
+    )
+  `);
+
   // Create vector index if it doesn't exist (idempotent check)
   const indexExists = await pool.query(`
     SELECT 1 FROM pg_indexes

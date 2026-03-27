@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDocumentViewer } from '../hooks/useDocumentViewer';
 import { useStreamingQuery } from '../hooks/useStreamingQuery';
 import SplitLayout from '../components/SplitLayout';
@@ -7,6 +7,7 @@ import DocumentViewer from '../components/DocumentViewer';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { FileText, FolderOpen, LogOut } from 'lucide-react';
+import { getTags } from '../lib/api';
 
 export default function QueryPage() {
   const documentViewer = useDocumentViewer();
@@ -15,12 +16,17 @@ export default function QueryPage() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
+  const [allTags, setAllTags] = useState([]);
+  const [selectedTagIds, setSelectedTagIds] = useState([]);
 
-  async function handleSendMessage(question) {
+  useEffect(() => {
+    getTags().then((data) => setAllTags(data.tags || [])).catch(() => {});
+  }, []);
+
+  async function handleSendMessage(question, tagIds) {
     const userMessage = { role: 'user', content: question };
     setMessages((prev) => [...prev, userMessage]);
-
-    await streaming.sendQuery(question, conversationId);
+    await streaming.sendQuery(question, conversationId, tagIds?.length ? tagIds : null);
   }
 
   function handleNewChat() {
@@ -88,6 +94,9 @@ export default function QueryPage() {
               onNewChat={handleNewChat}
               onOpenDocument={documentViewer.openDocument}
               sources={streaming.sources}
+              allTags={allTags}
+              selectedTagIds={selectedTagIds}
+              onTagsChange={setSelectedTagIds}
             />
           }
           rightPanel={

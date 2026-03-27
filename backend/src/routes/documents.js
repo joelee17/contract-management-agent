@@ -12,10 +12,19 @@ async function streamToBuffer(stream) {
 }
 
 export default async function documentsRoutes(fastify) {
-  // GET /documents - list all indexed files
+  // GET /documents - list all indexed files with their tags
   fastify.get('/documents', { preHandler: [authenticate] }, async (request, reply) => {
     const result = await query(
-      'SELECT file_id, file_name, mime_type, modified_time, chunk_count, indexed_at FROM indexed_files ORDER BY indexed_at DESC'
+      `SELECT f.file_id, f.file_name, f.mime_type, f.modified_time, f.chunk_count, f.indexed_at,
+         COALESCE(
+           json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color))
+           FILTER (WHERE t.id IS NOT NULL), '[]'
+         ) AS tags
+       FROM indexed_files f
+       LEFT JOIN document_tags dt ON f.file_id = dt.file_id
+       LEFT JOIN tags t ON dt.tag_id = t.id
+       GROUP BY f.file_id, f.file_name, f.mime_type, f.modified_time, f.chunk_count, f.indexed_at
+       ORDER BY f.indexed_at DESC`
     );
     return reply.send({ documents: result.rows });
   });

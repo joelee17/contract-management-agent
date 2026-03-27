@@ -64,7 +64,7 @@ export async function register(email, password, name) {
   return response.json();
 }
 
-export async function queryContracts(question, conversationId) {
+export async function queryContracts(question, conversationId, tagIds = null) {
   const token = getToken();
   const response = await fetch(`${baseUrl}/api/query`, {
     method: 'POST',
@@ -72,7 +72,7 @@ export async function queryContracts(question, conversationId) {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ question, conversationId }),
+    body: JSON.stringify({ question, conversationId, ...(tagIds?.length ? { tagIds } : {}) }),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -103,6 +103,34 @@ export async function triggerSync() {
   const response = await fetchWithAuth('/api/sync', {
     method: 'POST',
     body: '{}',
+  });
+  return response.json();
+}
+
+export async function getTags() {
+  const response = await fetchWithAuth('/api/tags');
+  return response.json();
+}
+
+export async function createTag(name, color) {
+  const response = await fetchWithAuth('/api/tags', {
+    method: 'POST',
+    body: JSON.stringify({ name, color }),
+  });
+  return response.json();
+}
+
+export async function addTagToDocument(fileId, tagId) {
+  const response = await fetchWithAuth(`/api/documents/${fileId}/tags`, {
+    method: 'POST',
+    body: JSON.stringify({ tagId }),
+  });
+  return response.json();
+}
+
+export async function removeTagFromDocument(fileId, tagId) {
+  const response = await fetchWithAuth(`/api/documents/${fileId}/tags/${tagId}`, {
+    method: 'DELETE',
   });
   return response.json();
 }

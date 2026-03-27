@@ -17,14 +17,14 @@ export function useStreamingQuery() {
     setIsStreaming(false);
   }, []);
 
-  const sendQuery = useCallback(async (question, conversationId) => {
+  const sendQuery = useCallback(async (question, conversationId, tagIds = null) => {
     abortRef.current = false;
     setIsStreaming(true);
     setResponse('');
     setSources([]);
 
     try {
-      const reader = await queryContracts(question, conversationId);
+      const reader = await queryContracts(question, conversationId, tagIds);
       readerRef.current = reader;
       const decoder = new TextDecoder();
       let buffer = '';
