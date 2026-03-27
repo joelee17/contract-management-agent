@@ -19,6 +19,10 @@ function isPdf(fileName) {
   return fileName?.toLowerCase().endsWith('.pdf');
 }
 
+function isDocx(fileName) {
+  return fileName?.toLowerCase().endsWith('.docx');
+}
+
 export default function DocumentViewer({
   fileId,
   page,
@@ -27,6 +31,7 @@ export default function DocumentViewer({
   onClose,
 }) {
   const [pdfUrl, setPdfUrl] = useState(null);
+  const [htmlUrl, setHtmlUrl] = useState(null);
   const [textContent, setTextContent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,6 +47,7 @@ export default function DocumentViewer({
     setLoading(true);
     setError('');
     setPdfUrl(null);
+    setHtmlUrl(null);
     setTextContent(null);
 
     getDocumentPdf(fileId)
@@ -50,8 +56,10 @@ export default function DocumentViewer({
         if (isPdf(fileName)) {
           const url = URL.createObjectURL(blob);
           setPdfUrl(url);
+        } else if (isDocx(fileName)) {
+          const url = URL.createObjectURL(blob);
+          setHtmlUrl(url);
         } else {
-          // Render as plain text for .txt, .docx exports, etc.
           const text = await blob.text();
           setTextContent(text);
         }
@@ -65,10 +73,8 @@ export default function DocumentViewer({
 
     return () => {
       cancelled = true;
-      setPdfUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
+      setPdfUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+      setHtmlUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
     };
   }, [fileId, fileName]);
 
@@ -194,6 +200,13 @@ export default function DocumentViewer({
               <p className="text-sm text-[var(--color-text-secondary)]">{error}</p>
             </div>
           </div>
+        ) : htmlUrl ? (
+          <iframe
+            src={htmlUrl}
+            className="w-full h-full border-0"
+            title={fileName}
+            sandbox="allow-same-origin"
+          />
         ) : textContent != null ? (
           <pre className="p-6 text-sm text-[var(--color-text-primary)] font-mono whitespace-pre-wrap leading-relaxed">
             {textContent}
