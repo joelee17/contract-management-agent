@@ -1,4 +1,5 @@
 import pg from 'pg';
+import pgvector from 'pgvector/pg';
 import config from './config.js';
 
 const pool = new pg.Pool({
@@ -10,6 +11,11 @@ const pool = new pg.Pool({
 
 pool.on('error', (err) => {
   console.error('Unexpected database pool error:', err);
+});
+
+// Register pgvector types so parameterized queries work with vector columns
+pool.on('connect', (client) => {
+  pgvector.registerType(client);
 });
 
 export async function query(text, params) {
@@ -91,8 +97,7 @@ export async function initDb() {
   if (indexExists.rows.length === 0) {
     await pool.query(`
       CREATE INDEX document_chunks_embedding_idx
-      ON document_chunks USING ivfflat (embedding vector_cosine_ops)
-      WITH (lists = 100)
+      ON document_chunks USING hnsw (embedding vector_cosine_ops)
     `);
   }
 

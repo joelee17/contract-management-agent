@@ -55,7 +55,12 @@ export function useStreamingQuery() {
                 // ignore parse errors
               }
             } else if (currentEvent === 'text') {
-              setResponse((prev) => prev + data);
+              try {
+                const text = JSON.parse(data);
+                setResponse((prev) => prev + text);
+              } catch {
+                setResponse((prev) => prev + data);
+              }
             } else if (currentEvent === 'done') {
               // Stream complete
             } else if (currentEvent === 'error') {

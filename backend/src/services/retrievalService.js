@@ -1,3 +1,4 @@
+import pgvector from 'pgvector/pg';
 import { query as dbQuery } from '../db.js';
 import { embedQuery } from './embeddingService.js';
 
@@ -10,7 +11,7 @@ import { embedQuery } from './embeddingService.js';
 export async function retrieveAndBuildPrompt(query, topK = 8) {
   // 1. Embed the query
   const queryVector = await embedQuery(query);
-  const vectorLiteral = `[${queryVector.join(',')}]`;
+  const embedding = pgvector.toSql(queryVector);
 
   // 2. Cosine similarity search using pgvector
   const result = await dbQuery(
@@ -23,11 +24,11 @@ export async function retrieveAndBuildPrompt(query, topK = 8) {
        chunk_text,
        char_offset_start,
        char_offset_end,
-       1 - (embedding <=> $1::vector) AS similarity
+       1 - (embedding <=> $1) AS similarity
      FROM document_chunks
-     ORDER BY embedding <=> $1::vector
+     ORDER BY embedding <=> $1
      LIMIT $2`,
-    [vectorLiteral, topK],
+    [embedding, topK],
   );
 
   const sources = result.rows.map((row, idx) => ({

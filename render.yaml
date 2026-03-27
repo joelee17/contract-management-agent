@@ -23,7 +23,7 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ANTHROPIC_MODEL
-        value: claude-haiku-4-5-20251001
+        value: claude-sonnet-4-6
       - key: VOYAGE_API_KEY
         sync: false
       - key: GOOGLE_SERVICE_ACCOUNT_KEY
@@ -42,6 +42,9 @@ services:
     runtime: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://contract-agent-api.onrender.com
     routes:
       - type: rewrite
         source: /api/*

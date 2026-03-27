@@ -1,14 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import config from '../config.js';
+
 import { query as dbQuery } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
-import { retrieveContext } from '../services/retrievalService.js';
+import { retrieveAndBuildPrompt } from '../services/retrievalService.js';
 
 const anthropic = new Anthropic({ apiKey: config.anthropicApiKey });
-
-const SYSTEM_PROMPT = `You are a contract management assistant. You help users understand and analyze their contracts and legal documents.
-Use the provided context from the user's documents to answer questions accurately. If the context doesn't contain enough information to answer, say so clearly.
-Always cite which document(s) your answer is based on when relevant.`;
 
 export default async function queryRoutes(fastify) {
   fastify.post('/query', { preHandler: [authenticate] }, async (request, reply) => {
@@ -35,32 +32,20 @@ export default async function queryRoutes(fastify) {
       [convId, 'user', question]
     );
 
-    // Retrieve relevant context and sources
-    const { context, sources } = await retrieveContext(question);
+    // Retrieve relevant context and build prompt with sources
+    const { systemPrompt, userMessage, sources } = await retrieveAndBuildPrompt(question);
 
-    // Load conversation history
-    const historyResult = await dbQuery(
-      'SELECT role, content FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC',
-      [convId]
-    );
-    const history = historyResult.rows.slice(-10); // last 10 messages for context window
-
-    // Build messages array
-    const messages = history.map((m) => ({ role: m.role, content: m.content }));
-    // Append context to the latest user message
-    const lastIdx = messages.length - 1;
-    if (context) {
-      messages[lastIdx] = {
-        role: 'user',
-        content: `Context from documents:\n${context}\n\nQuestion: ${messages[lastIdx].content}`,
-      };
-    }
-
-    // Set SSE headers
+    // Set SSE headers (must include CORS manually since we bypass Fastify's response pipeline)
+    const origin = request.headers.origin;
+    const allowedOrigins = [config.frontendUrl, 'http://localhost:5173'];
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
+      'Connection': 'keep-alive',
+      ...(allowedOrigins.includes(origin) && {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Credentials': 'true',
+      }),
     });
 
     // Send sources as the first SSE event
@@ -73,8 +58,8 @@ export default async function queryRoutes(fastify) {
       const stream = anthropic.messages.stream({
         model: config.anthropicModel,
         max_tokens: 2048,
-        system: SYSTEM_PROMPT,
-        messages,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }],
       });
 
       for await (const event of stream) {

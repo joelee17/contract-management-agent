@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Worker, Viewer, SpecialZoomLevel } from '@react-pdf-viewer/core';
+import { useState, useEffect } from 'react';
+import { Worker, Viewer } from '@react-pdf-viewer/core';
 import { highlightPlugin } from '@react-pdf-viewer/highlight';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/highlight/lib/styles/index.css';
@@ -15,6 +15,10 @@ import {
   FileText,
 } from 'lucide-react';
 
+function isPdf(fileName) {
+  return fileName?.toLowerCase().endsWith('.pdf');
+}
+
 export default function DocumentViewer({
   fileId,
   page,
@@ -23,41 +27,50 @@ export default function DocumentViewer({
   onClose,
 }) {
   const [pdfUrl, setPdfUrl] = useState(null);
+  const [textContent, setTextContent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1);
 
-  // Load PDF when fileId changes
+  // Load document when fileId changes
   useEffect(() => {
     if (!fileId) return;
 
-    let revoked = false;
+    let cancelled = false;
     setLoading(true);
     setError('');
+    setPdfUrl(null);
+    setTextContent(null);
 
     getDocumentPdf(fileId)
-      .then((blob) => {
-        if (revoked) return;
-        const url = URL.createObjectURL(blob);
-        setPdfUrl(url);
+      .then(async (blob) => {
+        if (cancelled) return;
+        if (isPdf(fileName)) {
+          const url = URL.createObjectURL(blob);
+          setPdfUrl(url);
+        } else {
+          // Render as plain text for .txt, .docx exports, etc.
+          const text = await blob.text();
+          setTextContent(text);
+        }
       })
       .catch((err) => {
-        if (!revoked) setError(err.message);
+        if (!cancelled) setError(err.message);
       })
       .finally(() => {
-        if (!revoked) setLoading(false);
+        if (!cancelled) setLoading(false);
       });
 
     return () => {
-      revoked = true;
+      cancelled = true;
       setPdfUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return null;
       });
     };
-  }, [fileId]);
+  }, [fileId, fileName]);
 
   // Jump to page when it changes
   useEffect(() => {
@@ -168,7 +181,7 @@ export default function DocumentViewer({
         )}
       </div>
 
-      {/* PDF content */}
+      {/* Document content */}
       <div className="flex-1 overflow-auto">
         {loading ? (
           <div className="h-full flex items-center justify-center">
@@ -178,11 +191,13 @@ export default function DocumentViewer({
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
               <AlertCircle className="w-8 h-8 text-[var(--color-danger)] mx-auto mb-2" />
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                {error}
-              </p>
+              <p className="text-sm text-[var(--color-text-secondary)]">{error}</p>
             </div>
           </div>
+        ) : textContent != null ? (
+          <pre className="p-6 text-sm text-[var(--color-text-primary)] font-mono whitespace-pre-wrap leading-relaxed">
+            {textContent}
+          </pre>
         ) : pdfUrl ? (
           <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
             <div style={{ height: '100%' }}>
@@ -191,12 +206,8 @@ export default function DocumentViewer({
                 initialPage={currentPage}
                 defaultScale={scale}
                 plugins={[highlightPluginInstance]}
-                onDocumentLoad={(e) => {
-                  setTotalPages(e.doc.numPages);
-                }}
-                onPageChange={(e) => {
-                  setCurrentPage(e.currentPage);
-                }}
+                onDocumentLoad={(e) => setTotalPages(e.doc.numPages)}
+                onPageChange={(e) => setCurrentPage(e.currentPage)}
               />
             </div>
           </Worker>

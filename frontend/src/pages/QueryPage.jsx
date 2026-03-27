@@ -80,15 +80,6 @@ export default function QueryPage() {
         <SplitLayout
           showLeft={showViewer}
           leftPanel={
-            <DocumentViewer
-              fileId={documentViewer.activeFileId}
-              page={documentViewer.activePage}
-              highlights={documentViewer.highlights}
-              fileName={documentViewer.activeFileName}
-              onClose={documentViewer.closeDocument}
-            />
-          }
-          rightPanel={
             <ChatInterface
               messages={allMessages}
               isStreaming={streaming.isStreaming}
@@ -97,6 +88,15 @@ export default function QueryPage() {
               onNewChat={handleNewChat}
               onOpenDocument={documentViewer.openDocument}
               sources={streaming.sources}
+            />
+          }
+          rightPanel={
+            <DocumentViewer
+              fileId={documentViewer.activeFileId}
+              page={documentViewer.activePage}
+              highlights={documentViewer.highlights}
+              fileName={documentViewer.activeFileName}
+              onClose={documentViewer.closeDocument}
             />
           }
         />

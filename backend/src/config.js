@@ -1,4 +1,5 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
 
 export default {
   port: parseInt(process.env.PORT || '3001', 10),
@@ -12,7 +13,7 @@ export default {
 
   // Anthropic
   anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-  anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
+  anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
 
   // Voyage AI Embeddings
   voyageApiKey: process.env.VOYAGE_API_KEY,
