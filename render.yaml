@@ -1,6 +1,6 @@
 databases:
   - name: contract-agent-db
-    plan: starter
+    plan: free
     databaseName: contract_agent
     postgresMajorVersion: "16"
     ipAllowList: []
