@@ -1,0 +1,25 @@
+{
+  "name": "contract-management-agent-api",
+  "version": "1.0.0",
+  "description": "Contract Management Agent - Backend API",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "@fastify/cors": "^10.0.2",
+    "@fastify/jwt": "^9.0.2",
+    "googleapis": "^144.0.0",
+    "mammoth": "^1.8.0",
+    "pdf-parse": "^1.1.1",
+    "pg": "^8.13.1",
+    "pgvector": "^0.2.0",
+    "voyageai": "^0.0.3"
+  }
+}
