@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Worker, Viewer } from '@react-pdf-viewer/core';
 import { searchPlugin } from '@react-pdf-viewer/search';
 import '@react-pdf-viewer/core/lib/styles/index.css';
@@ -124,9 +124,9 @@ export default function DocumentViewer({
 
   const chunkText = highlights?.[0]?.chunkText || null;
 
-  // Stable search plugin instance — recreated only when fileId changes so the
-  // Viewer doesn't remount on every highlight change
-  const searchPluginInstance = useMemo(() => searchPlugin(), [fileId]);
+  // Stable search plugin instance — created once on mount (lazy useState init)
+  // so React hooks inside searchPlugin() are always called unconditionally
+  const [searchPluginInstance] = useState(() => searchPlugin());
   const { highlight: pdfHighlight, clearHighlights: pdfClearHighlights } = searchPluginInstance;
 
   // Load document when fileId changes
