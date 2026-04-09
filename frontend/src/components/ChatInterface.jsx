@@ -271,12 +271,22 @@ export default function ChatInterface({
                           <span className="inline-block w-1.5 h-4 bg-[var(--color-accent)] animate-pulse rounded-sm ml-0.5 align-middle" />
                         )}
                       </div>
-                      {msg.sources && msg.sources.length > 0 && (
-                        <SourcesFooter
-                          sources={msg.sources}
-                          onOpenDocument={onOpenDocument}
-                        />
-                      )}
+                      {msg.sources && msg.sources.length > 0 && (() => {
+                        const citedIndices = new Set(
+                          parseCitations(msg.content)
+                            .filter((s) => s.type === 'citation')
+                            .map((s) => s.sourceIndex)
+                        );
+                        const citedSources = msg.sources.filter((s) =>
+                          citedIndices.has(s.sourceIndex)
+                        );
+                        return citedSources.length > 0 ? (
+                          <SourcesFooter
+                            sources={citedSources}
+                            onOpenDocument={onOpenDocument}
+                          />
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                 )}

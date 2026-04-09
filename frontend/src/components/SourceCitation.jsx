@@ -20,7 +20,8 @@ export default function SourceCitation({ sourceIndex, source, onOpenDocument }) 
         source.page || source.pageNumber,
         source.charOffsetStart,
         source.charOffsetEnd,
-        fileName
+        fileName,
+        source.chunkText
       );
     }
   }

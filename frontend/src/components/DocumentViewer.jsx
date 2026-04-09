@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Worker, Viewer } from '@react-pdf-viewer/core';
-import { highlightPlugin } from '@react-pdf-viewer/highlight';
+import { searchPlugin } from '@react-pdf-viewer/search';
 import '@react-pdf-viewer/core/lib/styles/index.css';
-import '@react-pdf-viewer/highlight/lib/styles/index.css';
+import '@react-pdf-viewer/search/lib/styles/index.css';
 import { getDocumentPdf } from '../lib/api';
 import {
   X,
@@ -23,6 +23,85 @@ function isDocx(fileName) {
   return fileName?.toLowerCase().endsWith('.docx');
 }
 
+/** Render plain text with the chunk passage highlighted and scrolled into view */
+function HighlightedText({ text, chunkText }) {
+  const markRef = useRef(null);
+
+  useEffect(() => {
+    if (markRef.current) {
+      markRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [chunkText]);
+
+  if (!chunkText || !text) {
+    return (
+      <pre className="p-6 text-sm text-[var(--color-text-primary)] font-mono whitespace-pre-wrap leading-relaxed">
+        {text}
+      </pre>
+    );
+  }
+
+  // Find first occurrence using first ~120 chars (case-insensitive)
+  const needle = chunkText.slice(0, 120).toLowerCase();
+  const idx = text.toLowerCase().indexOf(needle);
+  if (idx === -1) {
+    return (
+      <pre className="p-6 text-sm text-[var(--color-text-primary)] font-mono whitespace-pre-wrap leading-relaxed">
+        {text}
+      </pre>
+    );
+  }
+
+  const matchLen = Math.min(chunkText.length, text.length - idx);
+  return (
+    <pre className="p-6 text-sm text-[var(--color-text-primary)] font-mono whitespace-pre-wrap leading-relaxed">
+      {text.slice(0, idx)}
+      <mark
+        ref={markRef}
+        style={{ background: 'rgba(79, 70, 229, 0.25)', borderRadius: '2px', padding: '0 1px' }}
+      >
+        {text.slice(idx, idx + matchLen)}
+      </mark>
+      {text.slice(idx + matchLen)}
+    </pre>
+  );
+}
+
+/**
+ * Inject a highlight script into DOCX HTML.
+ * Uses TreeWalker to find the chunk text and wraps it in a <mark>.
+ */
+function injectHighlightScript(html, chunkText) {
+  if (!chunkText) return html;
+
+  const script = `<script>
+window.addEventListener('DOMContentLoaded', function() {
+  var needle = ${JSON.stringify(chunkText.slice(0, 200))}.replace(/\\s+/g, ' ').toLowerCase().trim();
+  if (!needle) return;
+  var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+  var node;
+  while ((node = walker.nextNode())) {
+    var val = node.nodeValue.replace(/\\s+/g, ' ');
+    var idx = val.toLowerCase().indexOf(needle.slice(0, 80));
+    if (idx !== -1) {
+      try {
+        var range = document.createRange();
+        range.setStart(node, idx);
+        range.setEnd(node, Math.min(idx + needle.length, node.nodeValue.length));
+        var mark = document.createElement('mark');
+        mark.style.cssText = 'background:rgba(79,70,229,0.25);border-radius:2px;padding:0 1px';
+        range.surroundContents(mark);
+        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch(e) { /* node may span multiple elements */ }
+      break;
+    }
+  }
+});
+<\/script>`;
+
+  return html.includes('</body>') ? html.replace('</body>', script + '</body>') : html + script;
+}
+
 export default function DocumentViewer({
   fileId,
   page,
@@ -38,6 +117,17 @@ export default function DocumentViewer({
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1);
+  const [pdfLoaded, setPdfLoaded] = useState(false);
+
+  // Store raw DOCX html separately so we can rebuild the blob when chunkText changes
+  const rawHtmlRef = useRef(null);
+
+  const chunkText = highlights?.[0]?.chunkText || null;
+
+  // Stable search plugin instance — recreated only when fileId changes so the
+  // Viewer doesn't remount on every highlight change
+  const searchPluginInstance = useMemo(() => searchPlugin(), [fileId]);
+  const { highlight: pdfHighlight, clearHighlights: pdfClearHighlights } = searchPluginInstance;
 
   // Load document when fileId changes
   useEffect(() => {
@@ -49,6 +139,8 @@ export default function DocumentViewer({
     setPdfUrl(null);
     setHtmlUrl(null);
     setTextContent(null);
+    setPdfLoaded(false);
+    rawHtmlRef.current = null;
 
     getDocumentPdf(fileId)
       .then(async (blob) => {
@@ -57,7 +149,10 @@ export default function DocumentViewer({
           const url = URL.createObjectURL(blob);
           setPdfUrl(url);
         } else if (isDocx(fileName)) {
-          const url = URL.createObjectURL(blob);
+          const html = await blob.text();
+          rawHtmlRef.current = html;
+          const injected = injectHighlightScript(html, chunkText);
+          const url = URL.createObjectURL(new Blob([injected], { type: 'text/html' }));
           setHtmlUrl(url);
         } else {
           const text = await blob.text();
@@ -76,38 +171,30 @@ export default function DocumentViewer({
       setPdfUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
       setHtmlUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
     };
-  }, [fileId, fileName]);
+  }, [fileId, fileName]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Rebuild DOCX blob URL when chunkText changes (same doc, different citation)
+  useEffect(() => {
+    if (!rawHtmlRef.current) return;
+    const injected = injectHighlightScript(rawHtmlRef.current, chunkText);
+    const url = URL.createObjectURL(new Blob([injected], { type: 'text/html' }));
+    setHtmlUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
+  }, [chunkText]);
 
   // Jump to page when it changes
   useEffect(() => {
-    if (page != null) {
-      setCurrentPage(page);
-    }
+    if (page != null) setCurrentPage(page);
   }, [page]);
 
-  // Highlight plugin configuration
-  const highlightPluginInstance = highlightPlugin({
-    renderHighlights: (props) => (
-      <div>
-        {highlights
-          ?.filter((h) => h.pageIndex === props.pageIndex)
-          .map((h, i) => (
-            <div
-              key={i}
-              style={{
-                background: 'rgba(79, 70, 229, 0.15)',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                pointerEvents: 'none',
-              }}
-            />
-          ))}
-      </div>
-    ),
-  });
+  // Re-run PDF highlight when chunkText changes (or after document loads)
+  useEffect(() => {
+    if (!pdfLoaded) return;
+    if (chunkText) {
+      pdfHighlight([{ keyword: chunkText.slice(0, 120).trim(), matchCase: false }]);
+    } else {
+      pdfClearHighlights();
+    }
+  }, [chunkText, pdfLoaded]);
 
   if (!fileId) {
     return (
@@ -202,15 +289,14 @@ export default function DocumentViewer({
           </div>
         ) : htmlUrl ? (
           <iframe
+            key={htmlUrl}
             src={htmlUrl}
             className="w-full h-full border-0"
             title={fileName}
-            sandbox="allow-same-origin"
+            sandbox="allow-same-origin allow-scripts"
           />
         ) : textContent != null ? (
-          <pre className="p-6 text-sm text-[var(--color-text-primary)] font-mono whitespace-pre-wrap leading-relaxed">
-            {textContent}
-          </pre>
+          <HighlightedText text={textContent} chunkText={chunkText} />
         ) : pdfUrl ? (
           <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
             <div style={{ height: '100%' }}>
@@ -218,8 +304,17 @@ export default function DocumentViewer({
                 fileUrl={pdfUrl}
                 initialPage={currentPage}
                 defaultScale={scale}
-                plugins={[highlightPluginInstance]}
-                onDocumentLoad={(e) => setTotalPages(e.doc.numPages)}
+                plugins={[searchPluginInstance]}
+                onDocumentLoad={(e) => {
+                  setTotalPages(e.doc.numPages);
+                  setPdfLoaded(true);
+                  if (chunkText) {
+                    // Small delay to let the text layer render
+                    setTimeout(() => {
+                      pdfHighlight([{ keyword: chunkText.slice(0, 120).trim(), matchCase: false }]);
+                    }, 400);
+                  }
+                }}
                 onPageChange={(e) => setCurrentPage(e.currentPage)}
               />
             </div>

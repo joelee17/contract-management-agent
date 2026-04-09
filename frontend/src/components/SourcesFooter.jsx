@@ -36,7 +36,8 @@ export default function SourcesFooter({ sources, onOpenDocument }) {
                     page,
                     source.charOffsetStart,
                     source.charOffsetEnd,
-                    fileName
+                    fileName,
+                    source.chunkText
                   )
                 }
                 className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-[var(--color-bg-secondary)] transition-colors"
