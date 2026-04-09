@@ -134,3 +134,34 @@ export async function removeTagFromDocument(fileId, tagId) {
   });
   return response.json();
 }
+
+export async function deleteDocument(fileId) {
+  const response = await fetchWithAuth(`/api/documents/${fileId}`, { method: 'DELETE' });
+  return response.json();
+}
+
+export async function getFolders() {
+  const response = await fetchWithAuth('/api/folders');
+  return response.json();
+}
+
+export async function createFolder(name) {
+  const response = await fetchWithAuth('/api/folders', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+  return response.json();
+}
+
+export async function deleteFolder(id) {
+  const response = await fetchWithAuth(`/api/folders/${id}`, { method: 'DELETE' });
+  return response.json();
+}
+
+export async function setDocumentFolder(fileId, folderId) {
+  const response = await fetchWithAuth(`/api/documents/${fileId}/folder`, {
+    method: 'PATCH',
+    body: JSON.stringify({ folderId }),
+  });
+  return response.json();
+}

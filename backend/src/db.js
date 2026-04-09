@@ -106,6 +106,19 @@ export async function initDb() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS folders (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT UNIQUE NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE indexed_files
+    ADD COLUMN IF NOT EXISTS folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL
+  `);
+
   // Create vector index if it doesn't exist (idempotent check)
   const indexExists = await pool.query(`
     SELECT 1 FROM pg_indexes
