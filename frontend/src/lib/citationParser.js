@@ -6,7 +6,7 @@ export function parseCitations(text) {
   if (!text) return [];
 
   const segments = [];
-  const regex = /\[Source\s+(\d+)\]/gi;
+  const regex = /\*{0,2}\[Source\s+(\d+)\]\*{0,2}/gi;
   let lastIndex = 0;
   let match;
 
