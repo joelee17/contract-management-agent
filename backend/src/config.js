@@ -15,9 +15,8 @@ export default {
   anthropicApiKey: process.env.ANTHROPIC_API_KEY,
   anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
 
-  // Voyage AI Embeddings
-  voyageApiKey: process.env.VOYAGE_API_KEY,
-  voyageModel: process.env.VOYAGE_MODEL || 'voyage-3-lite',
+  // OpenAI Embeddings
+  openaiApiKey: process.env.OPENAI_API_KEY,
   embeddingDimension: 512,
 
   // Google Drive

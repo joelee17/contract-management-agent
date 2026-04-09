@@ -1,7 +1,10 @@
-import { VoyageAIClient } from 'voyageai';
+import OpenAI from 'openai';
 import config from '../config.js';
 
-const client = new VoyageAIClient({ apiKey: config.voyageApiKey });
+const client = new OpenAI({ apiKey: config.openaiApiKey });
+
+const EMBEDDING_MODEL = 'text-embedding-3-small';
+const EMBEDDING_DIMENSIONS = 512; // matches existing pgvector column size
 
 /**
  * Embed an array of texts in a single batch request.
@@ -10,10 +13,10 @@ const client = new VoyageAIClient({ apiKey: config.voyageApiKey });
 export async function embedTexts(texts) {
   if (texts.length === 0) return [];
 
-  const result = await client.embed({
+  const result = await client.embeddings.create({
     input: texts,
-    model: config.voyageModel,
-    inputType: 'document',
+    model: EMBEDDING_MODEL,
+    dimensions: EMBEDDING_DIMENSIONS,
   });
 
   return result.data.map((d) => d.embedding);
@@ -24,10 +27,10 @@ export async function embedTexts(texts) {
  * Returns one embedding vector (number[]).
  */
 export async function embedQuery(query) {
-  const result = await client.embed({
+  const result = await client.embeddings.create({
     input: [query],
-    model: config.voyageModel,
-    inputType: 'query',
+    model: EMBEDDING_MODEL,
+    dimensions: EMBEDDING_DIMENSIONS,
   });
 
   return result.data[0].embedding;
