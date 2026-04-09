@@ -11,6 +11,7 @@ import {
   deleteDocument,
   getFolders,
   createFolder,
+  renameFolder,
   deleteFolder,
   setDocumentFolder,
 } from '../lib/api';
@@ -31,7 +32,8 @@ import {
   FolderOpen,
   FolderPlus,
   Trash2,
-  MoreHorizontal,
+  Pencil,
+  Check,
 } from 'lucide-react';
 
 const TAG_COLORS = [
@@ -39,6 +41,7 @@ const TAG_COLORS = [
   '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6',
 ];
 
+/* ─── Tag pill ──────────────────────────────────────────────────────────── */
 function TagPill({ tag, onRemove }) {
   return (
     <span
@@ -47,7 +50,7 @@ function TagPill({ tag, onRemove }) {
     >
       {tag.name}
       {onRemove && (
-        <button onClick={(e) => { e.stopPropagation(); onRemove(tag.id); }} className="hover:opacity-70 transition-opacity">
+        <button onClick={(e) => { e.stopPropagation(); onRemove(tag.id); }} className="hover:opacity-70">
           <X className="w-2.5 h-2.5" />
         </button>
       )}
@@ -55,40 +58,48 @@ function TagPill({ tag, onRemove }) {
   );
 }
 
-function TagPicker({ fileId, docTags, allTags, onAdd, onRemove }) {
+/* ─── Dropdown helper ───────────────────────────────────────────────────── */
+function Dropdown({ trigger, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    function outside(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', outside);
+    return () => document.removeEventListener('mousedown', outside);
   }, []);
-
-  const docTagIds = docTags.map((t) => t.id);
-  const unassigned = allTags.filter((t) => !docTagIds.includes(t.id));
-
   return (
     <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent-light)] transition-colors"
-        title="Manage tags"
-      >
+      <div onClick={() => setOpen((o) => !o)}>{trigger}</div>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 w-48 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-lg shadow-lg py-1">
+          {typeof children === 'function' ? children(() => setOpen(false)) : children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Tag picker ────────────────────────────────────────────────────────── */
+function TagPicker({ fileId, docTags, allTags, onAdd, onRemove }) {
+  const docTagIds = docTags.map((t) => t.id);
+  const unassigned = allTags.filter((t) => !docTagIds.includes(t.id));
+  return (
+    <Dropdown trigger={
+      <button className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent-light)] transition-colors" title="Manage tags">
         <Plus className="w-3 h-3" />
       </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-44 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-lg shadow-lg py-1">
+    }>
+      {(close) => (
+        <>
           {docTags.length > 0 && (
             <>
               <div className="px-3 py-1 text-xs text-[var(--color-text-muted)] font-medium uppercase tracking-wider">Assigned</div>
               {docTags.map((tag) => (
-                <button key={tag.id} onClick={() => onRemove(fileId, tag.id)} className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--color-bg-secondary)] transition-colors group">
+                <button key={tag.id} onClick={() => { onRemove(fileId, tag.id); close(); }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--color-bg-secondary)] group">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
                   <span className="flex-1 text-[var(--color-text-primary)] truncate">{tag.name}</span>
-                  <X className="w-3 h-3 text-[var(--color-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <X className="w-3 h-3 text-[var(--color-text-muted)] opacity-0 group-hover:opacity-100" />
                 </button>
               ))}
               {unassigned.length > 0 && <div className="my-1 border-t border-[var(--color-border)]" />}
@@ -98,7 +109,8 @@ function TagPicker({ fileId, docTags, allTags, onAdd, onRemove }) {
             <>
               <div className="px-3 py-1 text-xs text-[var(--color-text-muted)] font-medium uppercase tracking-wider">Add tag</div>
               {unassigned.map((tag) => (
-                <button key={tag.id} onClick={() => onAdd(fileId, tag.id)} className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--color-bg-secondary)] transition-colors">
+                <button key={tag.id} onClick={() => { onAdd(fileId, tag.id); close(); }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--color-bg-secondary)]">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
                   <span className="flex-1 text-[var(--color-text-primary)] truncate">{tag.name}</span>
                 </button>
@@ -106,188 +118,211 @@ function TagPicker({ fileId, docTags, allTags, onAdd, onRemove }) {
             </>
           )}
           {allTags.length === 0 && <div className="px-3 py-2 text-xs text-[var(--color-text-muted)]">No tags yet</div>}
-        </div>
+        </>
       )}
-    </div>
+    </Dropdown>
   );
 }
 
+/* ─── Folder picker ─────────────────────────────────────────────────────── */
 function FolderPicker({ fileId, currentFolderId, allFolders, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent-light)] transition-colors"
-        title="Move to folder"
-      >
+    <Dropdown trigger={
+      <button className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent-light)] transition-colors" title="Move to folder">
         <Folder className="w-3 h-3" />
       </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-48 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-lg shadow-lg py-1">
+    }>
+      {(close) => (
+        <>
           <div className="px-3 py-1 text-xs text-[var(--color-text-muted)] font-medium uppercase tracking-wider">Move to folder</div>
           {currentFolderId && (
-            <button
-              onClick={() => { onChange(fileId, null); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--color-bg-secondary)] transition-colors text-[var(--color-text-muted)]"
-            >
-              <X className="w-3 h-3" />
-              Remove from folder
+            <button onClick={() => { onChange(fileId, null); close(); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)]">
+              <X className="w-3 h-3" />Remove from folder
             </button>
           )}
           {allFolders.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => { onChange(fileId, f.id); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--color-bg-secondary)] transition-colors"
-            >
+            <button key={f.id} onClick={() => { onChange(fileId, f.id); close(); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--color-bg-secondary)]">
               <Folder className="w-3.5 h-3.5 text-[var(--color-accent)] flex-shrink-0" />
               <span className={`flex-1 truncate ${f.id === currentFolderId ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-text-primary)]'}`}>{f.name}</span>
-              {f.id === currentFolderId && <CheckCircle2 className="w-3 h-3 text-[var(--color-accent)]" />}
+              {f.id === currentFolderId && <Check className="w-3 h-3 text-[var(--color-accent)]" />}
             </button>
           ))}
           {allFolders.length === 0 && <div className="px-3 py-2 text-xs text-[var(--color-text-muted)]">No folders yet</div>}
-        </div>
+        </>
       )}
-    </div>
+    </Dropdown>
   );
 }
 
-function DocumentRow({ doc, allTags, allFolders, onAddTag, onRemoveTag, onSetFolder, onDelete }) {
-  const fileId = doc.file_id || doc.fileId;
+/* ─── Document tree row ─────────────────────────────────────────────────── */
+function DocTreeRow({ doc, isLast, allTags, allFolders, onAddTag, onRemoveTag, onSetFolder, onDelete }) {
+  const fileId = doc.file_id;
   const docTags = doc.tags || [];
 
-  function formatDate(dateStr) {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
+  function formatDate(s) {
+    if (!s) return '-';
+    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   return (
-    <tr className="hover:bg-[var(--color-bg-secondary)] transition-colors group">
-      <td className="px-5 py-3.5">
-        <div className="flex items-center gap-3">
-          <File className="w-5 h-5 text-[var(--color-accent)] flex-shrink-0" />
-          <span className="text-sm font-medium text-[var(--color-text-primary)]">
-            {doc.file_name || doc.name || doc.fileName}
-          </span>
+    <div className="flex items-start group">
+      {/* Tree connectors */}
+      <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 32, marginLeft: 16 }}>
+        <div className="w-px bg-[var(--color-border)]" style={{ height: 12 }} />
+        <div className="flex items-center" style={{ height: 20 }}>
+          <div className="w-px bg-[var(--color-border)]" style={{ height: isLast ? 10 : 20, alignSelf: 'flex-start' }} />
+          <div className="h-px bg-[var(--color-border)]" style={{ width: 12 }} />
         </div>
-      </td>
-      <td className="px-5 py-3.5">
-        <div className="flex items-center gap-1.5 flex-wrap">
+        {!isLast && <div className="w-px bg-[var(--color-border)] flex-1" style={{ minHeight: 4 }} />}
+      </div>
+
+      {/* Row content */}
+      <div className="flex-1 flex items-center gap-3 py-1.5 pr-3 rounded-lg hover:bg-[var(--color-bg-secondary)] transition-colors min-w-0">
+        <File className="w-4 h-4 text-[var(--color-accent)] flex-shrink-0" />
+
+        {/* File name */}
+        <span className="text-sm text-[var(--color-text-primary)] truncate flex-1 min-w-0">
+          {doc.file_name}
+        </span>
+
+        {/* Tags */}
+        <div className="flex items-center gap-1 flex-shrink-0">
           {docTags.map((tag) => (
             <TagPill key={tag.id} tag={tag} onRemove={(tagId) => onRemoveTag(fileId, tagId)} />
           ))}
           <TagPicker fileId={fileId} docTags={docTags} allTags={allTags} onAdd={onAddTag} onRemove={onRemoveTag} />
         </div>
-      </td>
-      <td className="px-5 py-3.5">
-        <div className="flex items-center gap-1">
+
+        {/* Chunk count */}
+        <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-accent-light)] text-[var(--color-accent)]">
+          {doc.chunk_count ?? '-'} chunks
+        </span>
+
+        {/* Date */}
+        <span className="flex-shrink-0 text-xs text-[var(--color-text-muted)] w-24 text-right">
+          {formatDate(doc.indexed_at)}
+        </span>
+
+        {/* Folder picker */}
+        <div className="flex-shrink-0">
           <FolderPicker fileId={fileId} currentFolderId={doc.folder_id} allFolders={allFolders} onChange={onSetFolder} />
         </div>
-      </td>
-      <td className="px-5 py-3.5">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-accent-light)] text-[var(--color-accent)]">
-          {doc.chunk_count ?? doc.chunkCount ?? '-'}
-        </span>
-      </td>
-      <td className="px-5 py-3.5">
-        <span className="text-sm text-[var(--color-text-muted)]">
-          {formatDate(doc.indexed_at || doc.lastIndexed || doc.indexedAt)}
-        </span>
-      </td>
-      <td className="px-3 py-3.5">
+
+        {/* Delete */}
         <button
-          onClick={() => onDelete(fileId, doc.file_name || doc.fileName)}
-          className="opacity-0 group-hover:opacity-100 p-1.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-danger)] hover:bg-red-50 transition-all"
-          title="Delete document"
+          onClick={() => onDelete(fileId, doc.file_name)}
+          className="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-danger)] hover:bg-red-50 transition-all"
+          title="Delete"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 
-function FolderSection({ folder, docs, allTags, allFolders, onAddTag, onRemoveTag, onSetFolder, onDelete, onDeleteFolder, defaultOpen = true }) {
-  const [expanded, setExpanded] = useState(defaultOpen);
+/* ─── Folder section ────────────────────────────────────────────────────── */
+function FolderSection({ folder, docs, allTags, allFolders, onAddTag, onRemoveTag, onSetFolder, onDelete, onRenameFolder, onDeleteFolder }) {
+  const [expanded, setExpanded] = useState(true);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(folder?.name || '');
+  const renameRef = useRef(null);
+
+  useEffect(() => {
+    if (renaming) renameRef.current?.select();
+  }, [renaming]);
+
+  function startRename() {
+    setRenameValue(folder.name);
+    setRenaming(true);
+  }
+
+  function commitRename() {
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== folder.name) onRenameFolder(folder.id, trimmed);
+    setRenaming(false);
+  }
+
+  function handleRenameKey(e) {
+    if (e.key === 'Enter') commitRename();
+    if (e.key === 'Escape') setRenaming(false);
+  }
+
+  const FolderIcon = expanded ? FolderOpen : Folder;
 
   return (
-    <div className="bg-[var(--color-bg-card)] rounded-xl border border-[var(--color-border)] overflow-hidden mb-3">
-      <button
-        onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] transition-colors group"
-      >
-        {expanded
-          ? <FolderOpen className="w-4 h-4 text-[var(--color-accent)]" />
-          : <Folder className="w-4 h-4 text-[var(--color-accent)]" />
-        }
-        <span className="flex-1 text-left">{folder ? folder.name : 'Unfiled'}</span>
-        <span className="text-xs text-[var(--color-text-muted)] mr-2">{docs.length} doc{docs.length !== 1 ? 's' : ''}</span>
-        {folder && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder.id, folder.name); }}
-            className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-danger)] hover:bg-red-50 transition-all mr-1"
-            title="Delete folder"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+    <div className="mb-2">
+      {/* Folder header */}
+      <div className="flex items-center gap-1 group/folder px-2 py-1.5 rounded-lg hover:bg-[var(--color-bg-secondary)] transition-colors">
+        <button onClick={() => setExpanded((e) => !e)} className="flex items-center gap-2 flex-1 min-w-0">
+          {expanded
+            ? <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-muted)] flex-shrink-0" />
+            : <ChevronRight className="w-3.5 h-3.5 text-[var(--color-text-muted)] flex-shrink-0" />
+          }
+          <FolderIcon className="w-4 h-4 text-[var(--color-accent)] flex-shrink-0" />
+
+          {renaming ? (
+            <input
+              ref={renameRef}
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={handleRenameKey}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 text-sm font-semibold bg-transparent border-b border-[var(--color-accent)] text-[var(--color-text-primary)] focus:outline-none min-w-0"
+            />
+          ) : (
+            <span className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
+              {folder ? folder.name : 'Unfiled'}
+            </span>
+          )}
+
+          <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0 ml-1">
+            {docs.length}
+          </span>
+        </button>
+
+        {folder && !renaming && (
+          <div className="flex items-center gap-0.5 opacity-0 group-hover/folder:opacity-100 transition-opacity">
+            <button onClick={startRename} className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors" title="Rename folder">
+              <Pencil className="w-3 h-3" />
+            </button>
+            <button onClick={() => onDeleteFolder(folder.id, folder.name)} className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-danger)] hover:bg-red-50 transition-colors" title="Delete folder">
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
         )}
-        {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-      </button>
+      </div>
 
-      {expanded && docs.length > 0 && (
-        <div className="border-t border-[var(--color-border)]">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[var(--color-border)]">
-                <th className="text-left px-5 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Document</th>
-                <th className="text-left px-5 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Tags</th>
-                <th className="text-left px-5 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Folder</th>
-                <th className="text-left px-5 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Chunks</th>
-                <th className="text-left px-5 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Last Indexed</th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border)]">
-              {docs.map((doc) => (
-                <DocumentRow
-                  key={doc.file_id || doc.fileId}
-                  doc={doc}
-                  allTags={allTags}
-                  allFolders={allFolders}
-                  onAddTag={onAddTag}
-                  onRemoveTag={onRemoveTag}
-                  onSetFolder={onSetFolder}
-                  onDelete={onDelete}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {expanded && docs.length === 0 && (
-        <div className="border-t border-[var(--color-border)] px-5 py-4 text-sm text-[var(--color-text-muted)]">
-          No documents in this folder
+      {/* Tree rows */}
+      {expanded && (
+        <div className="ml-2">
+          {docs.length === 0 ? (
+            <div className="pl-12 py-2 text-xs text-[var(--color-text-muted)]">Empty folder</div>
+          ) : (
+            docs.map((doc, i) => (
+              <DocTreeRow
+                key={doc.file_id}
+                doc={doc}
+                isLast={i === docs.length - 1}
+                allTags={allTags}
+                allFolders={allFolders}
+                onAddTag={onAddTag}
+                onRemoveTag={onRemoveTag}
+                onSetFolder={onSetFolder}
+                onDelete={onDelete}
+              />
+            ))
+          )}
         </div>
       )}
     </div>
   );
 }
 
+/* ─── Page ──────────────────────────────────────────────────────────────── */
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState([]);
   const [allTags, setAllTags] = useState([]);
@@ -304,22 +339,17 @@ export default function DocumentsPage() {
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(null); // { fileId, fileName }
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const navigate = useNavigate();
-  const { logout } = useAuth();
 
-  useEffect(() => {
-    loadAll();
-  }, []);
+  useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
     setLoading(true);
     setError('');
     try {
       const [docsData, tagsData, foldersData] = await Promise.all([
-        getDocuments(),
-        getTags(),
-        getFolders(),
+        getDocuments(), getTags(), getFolders(),
       ]);
       setDocuments(docsData.documents || []);
       setAllTags(tagsData.tags || []);
@@ -341,9 +371,7 @@ export default function DocumentsPage() {
       if (result.skipped > 0) parts.push(`${result.skipped} unchanged`);
       if (result.failed?.length > 0) parts.push(`${result.failed.length} failed`);
       const summary = parts.length ? parts.join(', ') : 'nothing to sync';
-      const failDetails = result.failed?.length
-        ? ' — ' + result.failed.map((f) => `${f.name}: ${f.error}`).join('; ')
-        : '';
+      const failDetails = result.failed?.length ? ' — ' + result.failed.map((f) => `${f.name}: ${f.error}`).join('; ') : '';
       setSyncMessage(`Sync complete: ${summary}${failDetails}`);
       await loadAll();
     } catch (err) {
@@ -360,14 +388,9 @@ export default function DocumentsPage() {
     try {
       const data = await createTag(newTagName.trim(), newTagColor);
       setAllTags((prev) => [...prev, data.tag].sort((a, b) => a.name.localeCompare(b.name)));
-      setNewTagName('');
-      setNewTagColor(TAG_COLORS[0]);
-      setShowCreateTag(false);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setCreatingTag(false);
-    }
+      setNewTagName(''); setNewTagColor(TAG_COLORS[0]); setShowCreateTag(false);
+    } catch (err) { setError(err.message); }
+    finally { setCreatingTag(false); }
   }
 
   async function handleCreateFolder(e) {
@@ -377,13 +400,17 @@ export default function DocumentsPage() {
     try {
       const data = await createFolder(newFolderName.trim());
       setAllFolders((prev) => [...prev, data.folder].sort((a, b) => a.name.localeCompare(b.name)));
-      setNewFolderName('');
-      setShowCreateFolder(false);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setCreatingFolder(false);
-    }
+      setNewFolderName(''); setShowCreateFolder(false);
+    } catch (err) { setError(err.message); }
+    finally { setCreatingFolder(false); }
+  }
+
+  async function handleRenameFolder(id, name) {
+    try {
+      const data = await renameFolder(id, name);
+      setAllFolders((prev) => prev.map((f) => f.id === id ? data.folder : f).sort((a, b) => a.name.localeCompare(b.name)));
+      setDocuments((prev) => prev.map((d) => d.folder_id === id ? { ...d, folder_name: data.folder.name } : d));
+    } catch (err) { setError(err.message); }
   }
 
   async function handleDeleteFolder(id, name) {
@@ -392,47 +419,31 @@ export default function DocumentsPage() {
       await deleteFolder(id);
       setAllFolders((prev) => prev.filter((f) => f.id !== id));
       setDocuments((prev) => prev.map((d) => d.folder_id === id ? { ...d, folder_id: null, folder_name: null } : d));
-    } catch (err) {
-      setError(err.message);
-    }
+    } catch (err) { setError(err.message); }
   }
 
   async function handleAddTag(fileId, tagId) {
     try {
       const data = await addTagToDocument(fileId, tagId);
-      setDocuments((prev) => prev.map((doc) => doc.file_id === fileId ? { ...doc, tags: data.tags } : doc));
-    } catch (err) {
-      setError(err.message);
-    }
+      setDocuments((prev) => prev.map((d) => d.file_id === fileId ? { ...d, tags: data.tags } : d));
+    } catch (err) { setError(err.message); }
   }
 
   async function handleRemoveTag(fileId, tagId) {
     try {
       await removeTagFromDocument(fileId, tagId);
-      setDocuments((prev) => prev.map((doc) =>
-        doc.file_id === fileId ? { ...doc, tags: doc.tags.filter((t) => t.id !== tagId) } : doc
-      ));
-    } catch (err) {
-      setError(err.message);
-    }
+      setDocuments((prev) => prev.map((d) => d.file_id === fileId ? { ...d, tags: d.tags.filter((t) => t.id !== tagId) } : d));
+    } catch (err) { setError(err.message); }
   }
 
   async function handleSetFolder(fileId, folderId) {
     try {
       await setDocumentFolder(fileId, folderId);
       const folder = allFolders.find((f) => f.id === folderId);
-      setDocuments((prev) => prev.map((doc) =>
-        doc.file_id === fileId
-          ? { ...doc, folder_id: folderId || null, folder_name: folder?.name || null }
-          : doc
+      setDocuments((prev) => prev.map((d) =>
+        d.file_id === fileId ? { ...d, folder_id: folderId || null, folder_name: folder?.name || null } : d
       ));
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  async function handleDeleteDocument(fileId, fileName) {
-    setConfirmDelete({ fileId, fileName });
+    } catch (err) { setError(err.message); }
   }
 
   async function confirmDeleteDocument() {
@@ -440,26 +451,18 @@ export default function DocumentsPage() {
     try {
       await deleteDocument(confirmDelete.fileId);
       setDocuments((prev) => prev.filter((d) => d.file_id !== confirmDelete.fileId));
-      setConfirmDelete(null);
-    } catch (err) {
-      setError(err.message);
-      setConfirmDelete(null);
-    }
+    } catch (err) { setError(err.message); }
+    finally { setConfirmDelete(null); }
   }
 
-  function toggleFilterTag(tagId) {
-    setFilterTagIds((prev) => prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]);
-  }
-
-  // Filter by selected tags
-  const filteredDocs = filterTagIds.length === 0
+  // Filter then group
+  const filtered = filterTagIds.length === 0
     ? documents
-    : documents.filter((doc) => filterTagIds.every((tid) => doc.tags?.some((t) => t.id === tid)));
+    : documents.filter((d) => filterTagIds.every((tid) => d.tags?.some((t) => t.id === tid)));
 
-  // Group documents by folder
-  const folderMap = new Map(); // folderId -> docs[]
+  const folderMap = new Map();
   const unfiled = [];
-  for (const doc of filteredDocs) {
+  for (const doc of filtered) {
     if (doc.folder_id) {
       if (!folderMap.has(doc.folder_id)) folderMap.set(doc.folder_id, []);
       folderMap.get(doc.folder_id).push(doc);
@@ -468,9 +471,19 @@ export default function DocumentsPage() {
     }
   }
 
+  const sharedProps = {
+    allTags, allFolders,
+    onAddTag: handleAddTag,
+    onRemoveTag: handleRemoveTag,
+    onSetFolder: handleSetFolder,
+    onDelete: (fileId, fileName) => setConfirmDelete({ fileId, fileName }),
+    onRenameFolder: handleRenameFolder,
+    onDeleteFolder: handleDeleteFolder,
+  };
+
   return (
     <div className="min-h-screen bg-[var(--color-bg-primary)]">
-      {/* Confirm delete modal */}
+      {/* Delete confirm modal */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
@@ -479,16 +492,12 @@ export default function DocumentsPage() {
               <span className="font-medium">{confirmDelete.fileName}</span> will be removed from the index. This cannot be undone.
             </p>
             <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="px-3 py-1.5 text-sm rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] transition-colors"
-              >
+              <button onClick={() => setConfirmDelete(null)}
+                className="px-3 py-1.5 text-sm rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] transition-colors">
                 Cancel
               </button>
-              <button
-                onClick={confirmDeleteDocument}
-                className="px-3 py-1.5 text-sm rounded-lg bg-[var(--color-danger)] text-white hover:opacity-90 transition-opacity"
-              >
+              <button onClick={confirmDeleteDocument}
+                className="px-3 py-1.5 text-sm rounded-lg bg-[var(--color-danger)] text-white hover:opacity-90 transition-opacity">
                 Delete
               </button>
             </div>
@@ -500,12 +509,9 @@ export default function DocumentsPage() {
       <header className="border-b border-[var(--color-border)] bg-[var(--color-bg-card)]">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/')}
-              className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
+            <button onClick={() => navigate('/')}
+              className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors">
+              <ArrowLeft className="w-4 h-4" />Back
             </button>
             <div className="w-px h-5 bg-[var(--color-border)]" />
             <h1 className="text-lg font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
@@ -513,12 +519,8 @@ export default function DocumentsPage() {
               Indexed Documents
             </h1>
           </div>
-
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
+          <button onClick={handleSync} disabled={syncing}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {syncing ? 'Syncing...' : 'Sync Now'}
           </button>
@@ -528,11 +530,9 @@ export default function DocumentsPage() {
       <div className="max-w-5xl mx-auto px-6 py-6">
         {syncMessage && (
           <div className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
-            syncMessage.startsWith('Sync failed') || syncMessage.includes('failed —')
-              ? 'bg-red-50 border border-red-200 text-red-700'
-              : syncMessage.includes('failed')
-              ? 'bg-amber-50 border border-amber-200 text-amber-700'
-              : 'bg-green-50 border border-green-200 text-green-700'
+            syncMessage.startsWith('Sync failed') || syncMessage.includes('failed —') ? 'bg-red-50 border border-red-200 text-red-700'
+            : syncMessage.includes('failed') ? 'bg-amber-50 border border-amber-200 text-amber-700'
+            : 'bg-green-50 border border-green-200 text-green-700'
           }`}>
             {syncMessage.includes('failed') ? <AlertCircle className="w-4 h-4 flex-shrink-0" /> : <CheckCircle2 className="w-4 h-4 flex-shrink-0" />}
             {syncMessage}
@@ -541,26 +541,21 @@ export default function DocumentsPage() {
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            {error}
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />{error}
             <button onClick={() => setError('')} className="ml-auto"><X className="w-3.5 h-3.5" /></button>
           </div>
         )}
 
-        {/* Toolbar: tag filter + folder create + tag create */}
-        <div className="mb-4 flex items-center gap-2 flex-wrap">
+        {/* Toolbar */}
+        <div className="mb-5 flex items-center gap-2 flex-wrap">
           <Tag className="w-4 h-4 text-[var(--color-text-muted)] flex-shrink-0" />
           {allTags.map((tag) => {
             const active = filterTagIds.includes(tag.id);
             return (
-              <button
-                key={tag.id}
-                onClick={() => toggleFilterTag(tag.id)}
+              <button key={tag.id} onClick={() => setFilterTagIds((p) => p.includes(tag.id) ? p.filter((id) => id !== tag.id) : [...p, tag.id])}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all"
-                style={active
-                  ? { backgroundColor: tag.color + '22', color: tag.color, borderColor: tag.color }
-                  : { backgroundColor: 'transparent', color: 'var(--color-text-secondary)', borderColor: 'var(--color-border)' }}
-              >
+                style={active ? { backgroundColor: tag.color + '22', color: tag.color, borderColor: tag.color }
+                  : { backgroundColor: 'transparent', color: 'var(--color-text-secondary)', borderColor: 'var(--color-border)' }}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
                 {tag.name}
                 {active && <X className="w-2.5 h-2.5 ml-0.5" />}
@@ -584,9 +579,7 @@ export default function DocumentsPage() {
                 {creatingTag ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Add'}
               </button>
               <button type="button" onClick={() => { setShowCreateTag(false); setNewTagName(''); }}
-                className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors">
-                <X className="w-3.5 h-3.5" />
-              </button>
+                className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"><X className="w-3.5 h-3.5" /></button>
             </form>
           ) : (
             <button onClick={() => setShowCreateTag(true)}
@@ -606,9 +599,7 @@ export default function DocumentsPage() {
                 {creatingFolder ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Create'}
               </button>
               <button type="button" onClick={() => { setShowCreateFolder(false); setNewFolderName(''); }}
-                className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors">
-                <X className="w-3.5 h-3.5" />
-              </button>
+                className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"><X className="w-3.5 h-3.5" /></button>
             </form>
           ) : (
             <button onClick={() => setShowCreateFolder(true)}
@@ -635,40 +626,12 @@ export default function DocumentsPage() {
             <p className="text-sm text-[var(--color-text-muted)] mt-1">Click "Sync Now" to index documents from Google Drive.</p>
           </div>
         ) : (
-          <div>
-            {/* Folders with documents */}
-            {allFolders.map((folder) => {
-              const docs = folderMap.get(folder.id) || [];
-              return (
-                <FolderSection
-                  key={folder.id}
-                  folder={folder}
-                  docs={docs}
-                  allTags={allTags}
-                  allFolders={allFolders}
-                  onAddTag={handleAddTag}
-                  onRemoveTag={handleRemoveTag}
-                  onSetFolder={handleSetFolder}
-                  onDelete={handleDeleteDocument}
-                  onDeleteFolder={handleDeleteFolder}
-                />
-              );
-            })}
-
-            {/* Unfiled documents */}
+          <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl p-4">
+            {allFolders.map((folder) => (
+              <FolderSection key={folder.id} folder={folder} docs={folderMap.get(folder.id) || []} {...sharedProps} />
+            ))}
             {unfiled.length > 0 && (
-              <FolderSection
-                folder={null}
-                docs={unfiled}
-                allTags={allTags}
-                allFolders={allFolders}
-                onAddTag={handleAddTag}
-                onRemoveTag={handleRemoveTag}
-                onSetFolder={handleSetFolder}
-                onDelete={handleDeleteDocument}
-                onDeleteFolder={handleDeleteFolder}
-                defaultOpen={true}
-              />
+              <FolderSection folder={null} docs={unfiled} {...sharedProps} />
             )}
           </div>
         )}

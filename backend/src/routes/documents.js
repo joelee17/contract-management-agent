@@ -64,6 +64,18 @@ export default async function documentsRoutes(fastify) {
     return reply.status(201).send({ folder: result.rows[0] });
   });
 
+  // PATCH /folders/:id - rename a folder
+  fastify.patch('/folders/:id', { preHandler: [authenticate] }, async (request, reply) => {
+    const { name } = request.body || {};
+    if (!name?.trim()) return reply.status(400).send({ error: 'Name is required' });
+    const result = await query(
+      'UPDATE folders SET name = $1 WHERE id = $2 RETURNING *',
+      [name.trim(), request.params.id]
+    );
+    if (result.rows.length === 0) return reply.status(404).send({ error: 'Folder not found' });
+    return reply.send({ folder: result.rows[0] });
+  });
+
   // DELETE /folders/:id - delete a folder (documents become unfoldered)
   fastify.delete('/folders/:id', { preHandler: [authenticate] }, async (request, reply) => {
     await query('DELETE FROM folders WHERE id = $1', [request.params.id]);

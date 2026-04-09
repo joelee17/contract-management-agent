@@ -153,6 +153,14 @@ export async function createFolder(name) {
   return response.json();
 }
 
+export async function renameFolder(id, name) {
+  const response = await fetchWithAuth(`/api/folders/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+  return response.json();
+}
+
 export async function deleteFolder(id) {
   const response = await fetchWithAuth(`/api/folders/${id}`, { method: 'DELETE' });
   return response.json();
