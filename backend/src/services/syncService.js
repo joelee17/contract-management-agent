@@ -23,6 +23,7 @@ export async function syncFiles() {
 
   let processed = 0;
   let skipped = 0;
+  const failed = [];
 
   for (const file of driveFiles) {
     const existingModified = indexedMap.get(file.id);
@@ -41,11 +42,12 @@ export async function syncFiles() {
       processed++;
     } catch (err) {
       console.error(`Failed to process file ${file.name} (${file.id}):`, err);
+      failed.push({ name: file.name, error: err.message });
     }
   }
 
-  console.log(`Sync complete: ${processed} processed, ${skipped} skipped`);
-  return { processed, skipped, total: driveFiles.length };
+  console.log(`Sync complete: ${processed} processed, ${skipped} skipped, ${failed.length} failed`);
+  return { processed, skipped, failed, total: driveFiles.length };
 }
 
 /**

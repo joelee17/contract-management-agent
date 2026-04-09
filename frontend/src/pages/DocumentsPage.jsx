@@ -185,7 +185,15 @@ export default function DocumentsPage() {
     setSyncMessage('');
     try {
       const result = await triggerSync();
-      setSyncMessage(result.message || 'Sync completed');
+      const parts = [];
+      if (result.processed > 0) parts.push(`${result.processed} new`);
+      if (result.skipped > 0) parts.push(`${result.skipped} unchanged`);
+      if (result.failed?.length > 0) parts.push(`${result.failed.length} failed`);
+      const summary = parts.length ? parts.join(', ') : 'nothing to sync';
+      const failDetails = result.failed?.length
+        ? ' — ' + result.failed.map((f) => `${f.name}: ${f.error}`).join('; ')
+        : '';
+      setSyncMessage(`Sync complete: ${summary}${failDetails}`);
       await loadDocuments();
     } catch (err) {
       setSyncMessage(`Sync failed: ${err.message}`);
@@ -302,8 +310,10 @@ export default function DocumentsPage() {
         {syncMessage && (
           <div
             className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
-              syncMessage.includes('failed')
+              syncMessage.startsWith('Sync failed') || syncMessage.includes('failed —')
                 ? 'bg-red-50 border border-red-200 text-red-700'
+                : syncMessage.includes('failed')
+                ? 'bg-amber-50 border border-amber-200 text-amber-700'
                 : 'bg-green-50 border border-green-200 text-green-700'
             }`}
           >
