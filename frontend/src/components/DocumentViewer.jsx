@@ -124,9 +124,8 @@ export default function DocumentViewer({
 
   const chunkText = highlights?.[0]?.chunkText || null;
 
-  // Stable search plugin instance — created once on mount (lazy useState init)
-  // so React hooks inside searchPlugin() are always called unconditionally
-  const [searchPluginInstance] = useState(() => searchPlugin());
+  // searchPlugin() must be called at the top level (it uses hooks internally)
+  const searchPluginInstance = searchPlugin();
   const { highlight: pdfHighlight, clearHighlights: pdfClearHighlights } = searchPluginInstance;
 
   // Load document when fileId changes
