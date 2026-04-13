@@ -67,7 +67,8 @@ export async function retrieveAndBuildPrompt(query, topK = 8, tagIds = null) {
   const systemPrompt = [
     'You are a contract-analysis assistant. Answer the user\'s question based ONLY on the provided document excerpts.',
     'If the excerpts do not contain enough information to answer, say so clearly.',
-    'Cite your sources using [Source N] notation (e.g. [Source 1], [Source 3]) where N refers to the numbered excerpts.',
+    'IMPORTANT: Cite sources using ONLY the exact format [Source N] where N is a single integer (e.g. [Source 1], [Source 3]).',
+    'Each citation must be its own bracket — never combine like [Source 1, 2] or write "Sources 1 and 2" without brackets.',
     'Be precise and refer to specific clauses, sections, or language from the contracts when relevant.',
   ].join('\n');
 

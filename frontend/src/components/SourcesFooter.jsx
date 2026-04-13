@@ -6,6 +6,16 @@ export default function SourcesFooter({ sources, onOpenDocument }) {
 
   if (!sources || sources.length === 0) return null;
 
+  // Deduplicate by fileId — show one entry per document (first cited chunk)
+  const uniqueSources = [];
+  const seenFileIds = new Set();
+  for (const source of sources) {
+    if (!seenFileIds.has(source.fileId)) {
+      seenFileIds.add(source.fileId);
+      uniqueSources.push(source);
+    }
+  }
+
   return (
     <div className="mt-3 border border-[var(--color-border)] rounded-lg overflow-hidden">
       <button
@@ -17,12 +27,12 @@ export default function SourcesFooter({ sources, onOpenDocument }) {
         ) : (
           <ChevronRight className="w-4 h-4" />
         )}
-        <span>Sources ({sources.length})</span>
+        <span>Sources ({uniqueSources.length})</span>
       </button>
 
       {expanded && (
         <div className="border-t border-[var(--color-border)] divide-y divide-[var(--color-border)]">
-          {sources.map((source, index) => {
+          {uniqueSources.map((source, index) => {
             const fileName = source.fileName || source.name || 'Unknown';
             const page = source.page || source.pageNumber;
             const section = source.section || source.heading;

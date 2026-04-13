@@ -30,36 +30,32 @@ export async function parseDocument(buffer, mimeType, fileName) {
 }
 
 /**
- * Parse a PDF buffer. Returns pages with per-page text where possible.
+ * Parse a PDF buffer. Returns pages with per-page text.
+ * Uses the pagerender callback to collect text per page in order.
  */
 export async function parsePdf(buffer) {
-  // pdf-parse provides per-page text via the pagerender callback
-  const pages = [];
+  const pageTexts = [];
 
-  const result = await pdfParse(buffer, {
-    // Custom page renderer that collects text per page
+  await pdfParse(buffer, {
+    // pdf-parse calls this sequentially for each page; we collect in order
     pagerender: async (pageData) => {
       const textContent = await pageData.getTextContent();
-      const strings = textContent.items.map((item) => item.str);
-      return strings.join(' ');
+      const text = textContent.items.map((item) => item.str).join(' ').trim();
+      pageTexts.push(text);
+      return text;
     },
   });
 
-  // pdf-parse stores per-page text in result.text separated by page breaks,
-  // but using the pagerender callback we get them in order.
-  // Split by the page-break markers that pdf-parse inserts.
-  const rawPages = result.text.split(/\f/);
+  const pages = pageTexts
+    .map((text, i) => ({ pageNumber: i + 1, text }))
+    .filter((p) => p.text.length > 0);
 
-  for (let i = 0; i < rawPages.length; i++) {
-    const text = rawPages[i].trim();
-    if (text) {
-      pages.push({ pageNumber: i + 1, text });
+  // Fallback: if the callback approach yielded nothing, parse without renderer
+  if (pages.length === 0) {
+    const result = await pdfParse(buffer);
+    if (result.text.trim()) {
+      return { pages: [{ pageNumber: 1, text: result.text.trim() }] };
     }
-  }
-
-  // Fallback: if splitting didn't work, treat as single page
-  if (pages.length === 0 && result.text.trim()) {
-    pages.push({ pageNumber: 1, text: result.text.trim() });
   }
 
   return { pages };

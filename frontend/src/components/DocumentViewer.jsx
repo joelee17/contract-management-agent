@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Worker, Viewer } from '@react-pdf-viewer/core';
 import { searchPlugin } from '@react-pdf-viewer/search';
+import { pageNavigationPlugin } from '@react-pdf-viewer/page-navigation';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/search/lib/styles/index.css';
 import { getDocumentPdf } from '../lib/api';
@@ -124,9 +125,12 @@ export default function DocumentViewer({
 
   const chunkText = highlights?.[0]?.chunkText || null;
 
-  // searchPlugin() must be called at the top level (it uses hooks internally)
+  // Both plugins must be called at the top level (they use hooks internally)
   const searchPluginInstance = searchPlugin();
   const { highlight: pdfHighlight, clearHighlights: pdfClearHighlights } = searchPluginInstance;
+
+  const pageNavPluginInstance = pageNavigationPlugin();
+  const { jumpToPage } = pageNavPluginInstance;
 
   // Load document when fileId changes
   useEffect(() => {
@@ -180,20 +184,26 @@ export default function DocumentViewer({
     setHtmlUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
   }, [chunkText]);
 
-  // Jump to page when it changes
+  // Jump to the correct page when page or document changes
   useEffect(() => {
-    if (page != null) setCurrentPage(page);
-  }, [page]);
+    if (page != null) {
+      setCurrentPage(page);
+      if (pdfLoaded) jumpToPage(page);
+    }
+  }, [page, pdfLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-run PDF highlight when chunkText changes (or after document loads)
+  // Re-run PDF text highlight when chunkText changes (or after document loads)
   useEffect(() => {
     if (!pdfLoaded) return;
     if (chunkText) {
-      pdfHighlight([{ keyword: chunkText.slice(0, 120).trim(), matchCase: false }]);
+      // Use a short phrase from the middle of the chunk for better match accuracy
+      const cleaned = chunkText.replace(/\s+/g, ' ').trim();
+      const keyword = cleaned.slice(0, 80).trim();
+      pdfHighlight([{ keyword, matchCase: false }]);
     } else {
       pdfClearHighlights();
     }
-  }, [chunkText, pdfLoaded]);
+  }, [chunkText, pdfLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!fileId) {
     return (
@@ -303,16 +313,18 @@ export default function DocumentViewer({
                 fileUrl={pdfUrl}
                 initialPage={currentPage}
                 defaultScale={scale}
-                plugins={[searchPluginInstance]}
+                plugins={[searchPluginInstance, pageNavPluginInstance]}
                 onDocumentLoad={(e) => {
                   setTotalPages(e.doc.numPages);
                   setPdfLoaded(true);
-                  if (chunkText) {
-                    // Small delay to let the text layer render
-                    setTimeout(() => {
-                      pdfHighlight([{ keyword: chunkText.slice(0, 120).trim(), matchCase: false }]);
-                    }, 400);
-                  }
+                  // Jump to page and highlight after text layers render
+                  setTimeout(() => {
+                    if (page != null) jumpToPage(page);
+                    if (chunkText) {
+                      const keyword = chunkText.replace(/\s+/g, ' ').slice(0, 80).trim();
+                      pdfHighlight([{ keyword, matchCase: false }]);
+                    }
+                  }, 600);
                 }}
                 onPageChange={(e) => setCurrentPage(e.currentPage)}
               />
