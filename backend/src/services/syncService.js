@@ -4,7 +4,7 @@ import { parseDocument } from './parserService.js';
 import { chunkDocument } from './chunkerService.js';
 import { embedTexts } from './embeddingService.js';
 
-/** Max texts to embed in a single Voyage API call. */
+/** Max texts to embed in a single embeddings API call. */
 const EMBED_BATCH_SIZE = 64;
 
 /**
