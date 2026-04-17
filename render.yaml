@@ -24,7 +24,7 @@ services:
         sync: false
       - key: ANTHROPIC_MODEL
         value: claude-sonnet-4-6
-      - key: VOYAGE_API_KEY
+      - key: OPENAI_API_KEY
         sync: false
       - key: GOOGLE_SERVICE_ACCOUNT_KEY
         sync: false
